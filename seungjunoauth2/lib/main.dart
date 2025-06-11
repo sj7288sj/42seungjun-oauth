@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_appauth/flutter_appauth.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:convert';
 
 final FlutterAppAuth appAuth = FlutterAppAuth();
@@ -10,7 +11,8 @@ final AuthorizationServiceConfiguration serviceConfig =
       tokenEndpoint: 'https://api.intra.42.fr/oauth/token',
     );
 
-void main() {
+void main() async {
+  await dotenv.load();
   runApp(const MainApp());
 }
 
@@ -22,38 +24,62 @@ class MainApp extends StatefulWidget {
 }
 
 class _MainAppState extends State<MainApp> {
+  String? _accessToken;
+  Map<String, dynamic>? _userInfo;
+
+  Future<Map<String, dynamic>> fetchUserInfo(String accessToken) async {
+    final url = Uri.parse('https://api.intra.42.fr/v2/me');
+    final response = await http.get(
+      url,
+      headers: {'Authorization': 'Bearer $accessToken'},
+    );
+    if (response.statusCode == 200) {
+      return json.decode(response.body);
+    } else {
+      throw Exception('fail fetch user info');
+    }
+  }
+
   Future<void> _login() async {
     try {
       final AuthorizationTokenResponse
       result = await appAuth.authorizeAndExchangeCode(
         AuthorizationTokenRequest(
-          'u-s4t2ud-f01bad212d59b7943e19fa664764d01102f620aae5dddb162eaa752dffbbdbdd',
-          'seungjunlogin://oauthredirect',
+          '${dotenv.env['CLIENT_UID']}',
+          'seungjunoauth://oauthredirect',
           clientSecret:
-              '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',
+              '${dotenv.env['SECRET_KEY']}',
           serviceConfiguration: serviceConfig,
           scopes: ['public'],
         ),
       );
       debugPrint('access Token: ${result.accessToken}');
       debugPrint('Refresh Token: ${result.refreshToken}');
-      final url = Uri.parse('https://api.intra.42.fr/v2/me');
-      final response = await http.get(
-        url,
-        headers: {'Authorization': 'Bearer ${result.accessToken}'},
-      );
-      if (response.statusCode == 200) {
-        debugPrint('success fetch user information');
-        final Map<String, dynamic> userData = json.decode(response.body);
-        debugPrint(userData.toString());
+      if (result.accessToken != null) {
+        final userInfo = await fetchUserInfo(result.accessToken!);
+        setState(() {
+          _accessToken = result.accessToken;
+          _userInfo = userInfo;
+        });
       }
+      debugPrint(_userInfo.toString());
     } catch (e) {
       debugPrint('login failed: $e');
     }
   }
 
+  Future<void> _logout() async {
+    try {
+      
+    } catch (e) {
+      debugPrint('something went wrong: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isLoggedIn = _accessToken != null;
+
     return MaterialApp(
       home: Scaffold(
         body: Center(
@@ -62,7 +88,14 @@ class _MainAppState extends State<MainApp> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text('hello'),
-              ElevatedButton(onPressed: _login, child: Text('login')),
+              ElevatedButton(
+                onPressed: !isLoggedIn ? _login : null,
+                child: Text('login'),
+              ),
+              isLoggedIn ? Text(_userInfo!['login']) : SizedBox(),
+              isLoggedIn
+                  ? ElevatedButton(onPressed: _logout, child: Text('logout'))
+                  : SizedBox(),
             ],
           ),
         ),

@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   flutter_appauth: ^9.0.1
+  flutter_dotenv: ^5.2.1
   http: ^1.4.0
 
 dev_dependencies:
@@ -18,4 +19,6 @@ dev_dependencies:
   flutter_lints: ^5.0.0
 
 flutter:
+  assets:
+    - .env
   uses-material-design: true
